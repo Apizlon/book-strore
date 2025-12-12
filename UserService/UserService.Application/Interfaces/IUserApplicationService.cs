@@ -13,4 +13,8 @@ public interface IUserApplicationService
     Task<UserResponse> ActivateUserAsync(string userId);
     Task<UserResponse> ChangeUserRoleAsync(string userId, ChangeUserRoleRequest request);
     Task<UserResponse> CreateOrSyncUserAsync(User user);
+    
+    // Новые методы для AuthService
+    Task<UserResponse> CreateUserAsync(CreateUserRequest request);
+    Task<bool> EmailExistsAsync(string email);
 }

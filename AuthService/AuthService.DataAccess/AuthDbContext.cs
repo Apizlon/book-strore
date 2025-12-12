@@ -41,6 +41,10 @@ public class AuthDbContext : DbContext
             entity.HasIndex(e => e.Username)
                 .IsUnique();
 
+            entity.Property(e => e.Role)
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
             entity.HasIndex(e => e.IsActive);
         });
     }

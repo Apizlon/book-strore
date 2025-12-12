@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using UserService.Application.Contracts;
 using UserService.Application.Interfaces;
@@ -8,6 +9,8 @@ namespace UserService.Application.Services;
 public class JwtTokenService : IJwtTokenService
 {
     private readonly ILogger<JwtTokenService> _logger;
+    private const string NameIdentifierClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
+    private const string NameClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
 
     public JwtTokenService(ILogger<JwtTokenService> logger)
     {
@@ -15,7 +18,7 @@ public class JwtTokenService : IJwtTokenService
     }
 
     /// <summary>
-    /// Extract user claims from Base64 encoded JWT token payload
+    /// Extract user claims from JWT token payload
     /// </summary>
     public UserClaimsDto ExtractClaimsFromToken(string token)
     {
@@ -45,6 +48,8 @@ public class JwtTokenService : IJwtTokenService
             var decodedBytes = Convert.FromBase64String(padded);
             var jsonPayload = Encoding.UTF8.GetString(decodedBytes);
 
+            _logger.LogInformation("Decoded JWT payload: {Payload}", jsonPayload);
+
             // Parse JSON to extract claims
             var claims = ExtractClaimsFromJson(jsonPayload);
 
@@ -59,47 +64,88 @@ public class JwtTokenService : IJwtTokenService
 
     private static UserClaimsDto ExtractClaimsFromJson(string json)
     {
-        // Simple JSON parsing for JWT claims
-        var userId = ExtractJsonValue(json, "sub") ?? ExtractJsonValue(json, "nameid");
-        var username = ExtractJsonValue(json, "unique_name") ?? ExtractJsonValue(json, "name");
-        var role = ExtractJsonValue(json, "role");
-        var permissionsStr = ExtractJsonValue(json, "permissions");
-
-        if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(username))
+        try
         {
-            throw new InvalidOperationException("UserId or Username claim not found");
+            using (var doc = JsonDocument.Parse(json))
+            {
+                var root = doc.RootElement;
+
+                // Try different claim name variants
+                string? userId = null;
+                if (root.TryGetProperty(NameIdentifierClaim, out var uidElement))
+                {
+                    userId = uidElement.GetString();
+                }
+                else if (root.TryGetProperty("sub", out var subElement))
+                {
+                    userId = subElement.GetString();
+                }
+                else if (root.TryGetProperty("nameid", out var nameidElement))
+                {
+                    userId = nameidElement.GetString();
+                }
+
+                string? username = null;
+                if (root.TryGetProperty(NameClaim, out var unElement))
+                {
+                    username = unElement.GetString();
+                }
+                else if (root.TryGetProperty("unique_name", out var uniqueElement))
+                {
+                    username = uniqueElement.GetString();
+                }
+                else if (root.TryGetProperty("name", out var nameElement))
+                {
+                    username = nameElement.GetString();
+                }
+
+                if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(username))
+                {
+                    throw new InvalidOperationException($"UserId or Username claim not found. Available claims: {string.Join(", ", root.EnumerateObject().Select(p => p.Name))}");
+                }
+
+                // Extract role
+                string? role = null;
+                if (root.TryGetProperty("role", out var roleElement))
+                {
+                    role = roleElement.GetString();
+                }
+
+                // Extract permissions
+                var permissions = new List<string>();
+                if (root.TryGetProperty("permission", out var permElement))
+                {
+                    if (permElement.ValueKind == JsonValueKind.Array)
+                    {
+                        permissions = permElement.EnumerateArray()
+                            .Select(p => p.GetString() ?? "")
+                            .Where(p => !string.IsNullOrEmpty(p))
+                            .ToList();
+                    }
+                }
+                else if (root.TryGetProperty("permissions", out var permsElement))
+                {
+                    var permsStr = permsElement.GetString();
+                    if (!string.IsNullOrEmpty(permsStr))
+                    {
+                        permissions = permsStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(p => p.Trim())
+                            .ToList();
+                    }
+                }
+
+                return new UserClaimsDto
+                {
+                    UserId = userId,
+                    Username = username,
+                    Role = role ?? "User",
+                    Permissions = permissions
+                };
+            }
         }
-
-        var permissions = string.IsNullOrEmpty(permissionsStr)
-            ? new List<string>()
-            : permissionsStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(p => p.Trim())
-                .ToList();
-
-        return new UserClaimsDto
+        catch (Exception ex)
         {
-            UserId = userId,
-            Username = username,
-            Role = role ?? "User",
-            Permissions = permissions
-        };
-    }
-
-    private static string? ExtractJsonValue(string json, string key)
-    {
-        // Look for "key":"value" pattern
-        var pattern = $"\\\"{key}\\\":\\\"([^\\\"]+)\\\"";
-        var match = System.Text.RegularExpressions.Regex.Match(json, pattern);
-
-        if (match.Success)
-        {
-            return match.Groups[1].Value;
+            throw new InvalidOperationException($"Failed to parse JWT payload: {ex.Message}", ex);
         }
-
-        // Try without quotes (for boolean/number values)
-        pattern = $"\\\"{key}\\\":([^,}}]+)";
-        match = System.Text.RegularExpressions.Regex.Match(json, pattern);
-
-        return match.Success ? match.Groups[1].Value : null;
     }
 }

@@ -10,22 +10,14 @@ namespace AuthService.DataAccess.Migrations
     /// <inheritdoc />
     public partial class SeedAdminUser : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             var adminPassword = HashPassword("admin");
-            
-            migrationBuilder.InsertData(
-                table: "AuthUsers",
-                columns: new[] { "Id", "Username", "PasswordHash", "IsActive", "Role", "CreatedAt" },
-                values: new object[] { 
-                    "550e8400-e29b-41d4-a716-446655440000", 
-                    "admin", 
-                    adminPassword,
-                    true,
-                    0, // Admin role
-                    new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-                });
+
+            migrationBuilder.Sql($@"
+                INSERT INTO ""AuthUsers"" (""Id"", ""Username"", ""PasswordHash"", ""IsActive"", ""Role"", ""CreatedAt"")
+                VALUES ('550e8400-e29b-41d4-a716-446655440000', 'admin', '{adminPassword}', TRUE, 'Admin', TIMESTAMPTZ '2024-01-01T00:00:00Z')
+            ");
         }
 
         /// <inheritdoc />

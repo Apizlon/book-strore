@@ -149,6 +149,46 @@ public class UserApplicationService : IUserApplicationService
 
         return MapToResponse(user);
     }
+    public async Task<UserResponse> CreateUserAsync(CreateUserRequest request)
+    {
+        // Проверь дублирование username
+        var existingUser = await _userRepository.GetUserByUsernameAsync(request.Username);
+        if (existingUser != null)
+        {
+            throw new InvalidOperationException("Username already exists");
+        }
+
+        // Проверь дублирование email
+        if (!string.IsNullOrEmpty(request.Email))
+        {
+            var emailExists = await _userRepository.EmailExistsAsync(request.Email);
+            if (emailExists)
+            {
+                throw new InvalidOperationException("Email already in use");
+            }
+        }
+
+        var user = new User
+        {
+            Id = request.Id,
+            Username = request.Username,
+            Email = request.Email,
+            DateOfBirth = request.DateOfBirth,
+            RegistrationDate = DateTime.UtcNow,
+            Role = UserRole.User,
+            IsActive = true
+        };
+
+        await _userRepository.CreateUserAsync(user);
+        _logger.LogInformation("User created via AuthService - {UserId}", user.Id);
+    
+        return MapToResponse(user);
+    }
+
+    public async Task<bool> EmailExistsAsync(string email)
+    {
+        return await _userRepository.EmailExistsAsync(email);
+    }
 
     private static UserResponse MapToResponse(User user) => new()
     {

@@ -1,4 +1,6 @@
-﻿namespace AuthService.Application.Contracts;
+﻿using AuthService.Application.Models;
+
+namespace AuthService.Application.Contracts;
 
 public class UserServiceUserResponse
 {
@@ -7,6 +9,6 @@ public class UserServiceUserResponse
     public string? Email { get; set; }
     public DateTime? DateOfBirth { get; set; }
     public DateTime RegistrationDate { get; set; }
-    public string Role { get; set; } = null!;
+    public UserRole Role { get; set; }
     public bool IsActive { get; set; }
 }

@@ -1,5 +1,4 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UserService.Application.Attributes;
 using UserService.Application.Contracts;
@@ -9,7 +8,6 @@ using UserService.Application.Models;
 
 namespace UserService.Api.Controllers;
 
-[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
@@ -31,15 +29,43 @@ public class UsersController : ControllerBase
         _logger = logger;
     }
 
+    [HttpPost]
+    public async Task<UserResponse> CreateUser([FromBody] CreateUserRequest request)
+    {
+        _logger.LogInformation("Creating user - {Username}", request.Username);
+        return await _userService.CreateUserAsync(request);
+    }
+
+    [HttpGet("by-username/{username}")]
+    public async Task<UserResponse> GetUserByUsername(string username)
+    {
+        _logger.LogInformation("Getting user by username - {Username}", username);
+        var user = await _userService.GetUserByUsernameAsync(username);
+        if (user == null)
+        {
+            throw new InvalidOperationException("User not found");
+        }
+
+        return user;
+    }
+
+    [HttpGet("email-exists/{email}")]
+    public async Task<IActionResult> EmailExists(string email)
+    {
+        _logger.LogInformation("Checking email existence - {Email}", email);
+        var exists = await _userService.EmailExistsAsync(email);
+        return Ok(new { exists });
+    }
+
     [HttpGet("{userId}")]
     public async Task<UserResponse> GetUser(string userId)
     {
         var claims = ExtractUserClaims();
-        
-        // User can only read their own profile unless they have ReadAllProfiles permission
+
         if (claims.UserId != userId && !_permissionService.HasPermission(claims, Permissions.ReadAllProfiles))
         {
-            _logger.LogWarning("User {Username} attempted unauthorized access to user {UserId}", claims.Username, userId);
+            _logger.LogWarning("User {Username} attempted unauthorized access to user {UserId}", claims.Username,
+                userId);
             throw new ForbiddenException("You do not have permission to access this user");
         }
 
@@ -50,7 +76,7 @@ public class UsersController : ControllerBase
     public async Task<IEnumerable<UserResponse>> GetAllUsers()
     {
         var claims = ExtractUserClaims();
-        
+
         if (!_permissionService.HasPermission(claims, Permissions.ReadAllProfiles))
         {
             _logger.LogWarning("User {Username} denied access to all users list", claims.Username);
@@ -64,11 +90,11 @@ public class UsersController : ControllerBase
     public async Task<UserResponse> UpdateUser(string userId, [FromBody] UpdateUserRequest request)
     {
         var claims = ExtractUserClaims();
-        
-        // User can update their own profile or any profile if they have UpdateAnyProfile permission
+
         if (claims.UserId != userId && !_permissionService.HasPermission(claims, Permissions.UpdateAnyProfile))
         {
-            _logger.LogWarning("User {Username} attempted unauthorized update of user {UserId}", claims.Username, userId);
+            _logger.LogWarning("User {Username} attempted unauthorized update of user {UserId}", claims.Username,
+                userId);
             throw new ForbiddenException("You do not have permission to update this user");
         }
 
@@ -80,7 +106,7 @@ public class UsersController : ControllerBase
     public async Task<UserResponse> DeactivateUser(string userId)
     {
         var claims = ExtractUserClaims();
-        
+
         if (!_permissionService.HasPermission(claims, Permissions.BlockUser))
         {
             _logger.LogWarning("User {Username} denied permission to deactivate users", claims.Username);
@@ -95,7 +121,7 @@ public class UsersController : ControllerBase
     public async Task<UserResponse> ActivateUser(string userId)
     {
         var claims = ExtractUserClaims();
-        
+
         if (!_permissionService.HasPermission(claims, Permissions.UnblockUser))
         {
             _logger.LogWarning("User {Username} denied permission to activate users", claims.Username);
@@ -110,7 +136,7 @@ public class UsersController : ControllerBase
     public async Task<UserResponse> ChangeUserRole(string userId, [FromBody] ChangeUserRoleRequest request)
     {
         var claims = ExtractUserClaims();
-        
+
         if (!_permissionService.HasPermission(claims, Permissions.ManageRoles))
         {
             _logger.LogWarning("User {Username} denied permission to manage roles", claims.Username);
