@@ -1,0 +1,24 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 as build
+WORKDIR /src
+
+COPY ["AuthService.Api/AuthService.Api.csproj", "AuthService.Api/"]
+COPY ["AuthService.Application/AuthService.Application.csproj", "AuthService.Application/"]
+COPY ["AuthService.DataAccess/AuthService.DataAccess.csproj", "AuthService.DataAccess/"]
+
+RUN dotnet restore "AuthService.Api/AuthService.Api.csproj"
+
+COPY . .
+
+RUN dotnet build "AuthService.Api/AuthService.Api.csproj" -c Release -o /app/build
+
+FROM build as publish
+RUN dotnet publish "AuthService.Api/AuthService.Api.csproj" -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+
+COPY --from=publish /app/publish .
+
+EXPOSE 5001
+
+ENTRYPOINT ["dotnet", "AuthService.Api.dll"]
