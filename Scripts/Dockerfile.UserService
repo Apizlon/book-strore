@@ -1,18 +1,18 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 as build
 WORKDIR /src
 
-COPY ["UserService.Api/UserService.Api.csproj", "UserService.Api/"]
-COPY ["UserService.Application/UserService.Application.csproj", "UserService.Application/"]
-COPY ["UserService.DataAccess/UserService.DataAccess.csproj", "UserService.DataAccess/"]
+COPY ["UserService/UserService.Api/UserService.Api.csproj", "UserService/UserService.Api/"]
+COPY ["UserService/UserService.Application/UserService.Application.csproj", "UserService/UserService.Application/"]
+COPY ["UserService/UserService.DataAccess/UserService.DataAccess.csproj", "UserService/UserService.DataAccess/"]
 
-RUN dotnet restore "UserService.Api/UserService.Api.csproj"
+RUN dotnet restore "UserService/UserService.Api/UserService.Api.csproj"
 
-COPY . .
+COPY UserService/ UserService/
 
-RUN dotnet build "UserService.Api/UserService.Api.csproj" -c Release -o /app/build
+RUN dotnet build "UserService/UserService.Api/UserService.Api.csproj" -c Release -o /app/build
 
 FROM build as publish
-RUN dotnet publish "UserService.Api/UserService.Api.csproj" -c Release -o /app/publish
+RUN dotnet publish "UserService/UserService.Api/UserService.Api.csproj" -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app

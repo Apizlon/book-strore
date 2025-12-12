@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "5301:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
@@ -25,7 +25,8 @@ services:
   # AuthService
   auth_service:
     build:
-      dockerfile: Dockerfile.AuthService
+      context: ..
+      dockerfile: Scripts/Dockerfile.AuthService
     container_name: auth_service
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -53,7 +54,8 @@ services:
   # UserService
   user_service:
     build:
-      dockerfile: Dockerfile.UserService
+      context: ..
+      dockerfile: Scripts/Dockerfile.UserService
     container_name: user_service
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -63,8 +65,6 @@ services:
       - "5002:5002"
     depends_on:
       postgres:
-        condition: service_healthy
-      auth_service:
         condition: service_healthy
     networks:
       - microservices_network
