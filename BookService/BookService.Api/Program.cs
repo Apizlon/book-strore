@@ -65,6 +65,12 @@ builder.Services.AddScoped<IOrderApplicationService, OrderApplicationService>();
 // Add JWT and Permission services
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddLogging(config =>
+{
+    config.ClearProviders();
+    config.AddConsole();
+    config.AddDebug();
+});
 
 // Add CORS
 builder.Services.AddCors(options =>

@@ -62,6 +62,12 @@ builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 // Add application services
 builder.Services.AddScoped<IAuthApplicationService, AuthApplicationService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddLogging(config =>
+{
+    config.ClearProviders();
+    config.AddConsole();
+    config.AddDebug();
+});
 
 // Add CORS
 builder.Services.AddCors(options =>
