@@ -56,14 +56,6 @@ builder.Services.AddScoped<IUserApplicationService, UserApplicationService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 
-// Add logging
-builder.Services.AddLogging(config =>
-{
-    config.ClearProviders();
-    config.AddConsole();
-    config.AddDebug();
-});
-
 // Add CORS
 builder.Services.AddCors(options =>
 {
@@ -78,12 +70,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+
+app.UseSwagger();
+app.UseSwaggerUI();
 
 // Auto-migrate database
 using (var scope = app.Services.CreateScope())

@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookService.Api", "BookService.Api\BookService.Api.csproj", "{972C5817-6D7F-4523-BF84-8307C4EBB4C9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookService.Application", "BookService.Application\BookService.Application.csproj", "{F06EF317-A27B-4DA5-9EEB-B62439210EE2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookService.DataAccess", "BookService.DataAccess\BookService.DataAccess.csproj", "{86B7744E-D31C-4004-AB48-2D795A6D703E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{972C5817-6D7F-4523-BF84-8307C4EBB4C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{972C5817-6D7F-4523-BF84-8307C4EBB4C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{972C5817-6D7F-4523-BF84-8307C4EBB4C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{972C5817-6D7F-4523-BF84-8307C4EBB4C9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F06EF317-A27B-4DA5-9EEB-B62439210EE2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F06EF317-A27B-4DA5-9EEB-B62439210EE2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F06EF317-A27B-4DA5-9EEB-B62439210EE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F06EF317-A27B-4DA5-9EEB-B62439210EE2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86B7744E-D31C-4004-AB48-2D795A6D703E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86B7744E-D31C-4004-AB48-2D795A6D703E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86B7744E-D31C-4004-AB48-2D795A6D703E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86B7744E-D31C-4004-AB48-2D795A6D703E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

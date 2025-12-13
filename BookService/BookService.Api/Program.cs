@@ -1,11 +1,11 @@
-using AuthService.Application.Services;
-using AuthService.Application.Interfaces;
-using AuthService.DataAccess;
-using AuthService.Api.Configuration;
-using AuthService.Api.Filters;
-using AuthService.DataAccess.Repositories;
-using Microsoft.EntityFrameworkCore;
+using BookService.Api.Configuration;
+using BookService.Application.Interfaces;
+using BookService.Application.Services;
+using BookService.DataAccess;
+using BookService.DataAccess.Repositories;
 using Microsoft.OpenApi.Models;
+using BookService.Api.Filters;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +16,7 @@ builder.Services.AddControllers(options => options.Filters.Add<CustomExceptionFi
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "AuthService API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "BookService API", Version = "v1" });
 
     // JWT Security для Bearer токенов
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -45,23 +45,26 @@ builder.Services.AddSwaggerGen(c =>
 
 // Add DbContext
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<AuthDbContext>(options =>
+builder.Services.AddDbContext<BookDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// Add HTTP client for UserService
-var userServiceUrl = builder.Configuration["Services:UserServiceUrl"] ?? "http://user_service:5002";
-builder.Services.AddHttpClient<IUserServiceClient, UserServiceClient>(client =>
-{
-    client.BaseAddress = new Uri(userServiceUrl);
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
-
 // Add repositories
-builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+builder.Services.AddScoped<IBookRepository, BookRepository>();
+builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<ICartRepository, CartRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 
 // Add application services
-builder.Services.AddScoped<IAuthApplicationService, AuthApplicationService>();
-builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<IBookApplicationService, BookApplicationService>();
+builder.Services.AddScoped<IAuthorApplicationService, AuthorApplicationService>();
+builder.Services.AddScoped<IReviewApplicationService, ReviewApplicationService>();
+builder.Services.AddScoped<ICartApplicationService, CartApplicationService>();
+builder.Services.AddScoped<IOrderApplicationService, OrderApplicationService>();
+
+// Add JWT and Permission services
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -83,7 +86,7 @@ app.UseSwaggerUI();
 // Auto-migrate database
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    var dbContext = scope.ServiceProvider.GetRequiredService<BookDbContext>();
     dbContext.Database.Migrate();
 }
 

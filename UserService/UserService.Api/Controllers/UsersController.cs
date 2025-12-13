@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using UserService.Application.Attributes;
 using UserService.Application.Contracts;
 using UserService.Application.Exceptions;

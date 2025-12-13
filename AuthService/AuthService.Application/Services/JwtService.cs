@@ -39,7 +39,7 @@ public class JwtService : IJwtService
         {
             new(ClaimTypes.NameIdentifier, userId),
             new(ClaimTypes.Name, username),
-            new("role", role.ToString()),
+            new(ClaimTypes.Role, role.ToString()), // ← Используй ClaimTypes.Role вместо "role"
             new("isActive", "true")
         };
 
@@ -74,7 +74,8 @@ public class JwtService : IJwtService
         };
     }
 
-    public (string userId, string username, string role, List<string> permissions) ValidateAndExtractClaims(string token)
+    public (string userId, string username, string role, List<string> permissions) ValidateAndExtractClaims(
+        string token)
     {
         try
         {
@@ -93,14 +94,14 @@ public class JwtService : IJwtService
                 ClockSkew = TimeSpan.Zero
             }, out SecurityToken validatedToken);
 
-            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value 
-                ?? throw new BadRequestException("UserId claim not found");
-            
-            var username = principal.FindFirst(ClaimTypes.Name)?.Value 
-                ?? throw new BadRequestException("Username claim not found");
-            
-            var role = principal.FindFirst("role")?.Value 
-                ?? throw new BadRequestException("Role claim not found");
+            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                         ?? throw new BadRequestException("UserId claim not found");
+
+            var username = principal.FindFirst(ClaimTypes.Name)?.Value
+                           ?? throw new BadRequestException("Username claim not found");
+
+            var role = principal.FindFirst(ClaimTypes.Role)?.Value
+                       ?? throw new BadRequestException("Role claim not found");
 
             var permissionsString = principal.FindFirst("permissions")?.Value ?? string.Empty;
             var permissions = permissionsString.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();

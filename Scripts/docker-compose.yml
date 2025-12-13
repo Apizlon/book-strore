@@ -29,7 +29,6 @@ services:
       dockerfile: Scripts/Dockerfile.AuthService
     container_name: auth_service
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5001
       ConnectionStrings__DefaultConnection: "Server=postgres;Port=5432;Database=auth_db;User Id=postgres;Password=postgres;"
       Jwt__Key: "your-super-secret-key-that-must-be-very-long-for-security-purposes-minimum-32-chars"
@@ -58,11 +57,31 @@ services:
       dockerfile: Scripts/Dockerfile.UserService
     container_name: user_service
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5002
       ConnectionStrings__DefaultConnection: "Server=postgres;Port=5432;Database=user_db;User Id=postgres;Password=postgres;"
     ports:
       - "5002:5002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure
+
+  book-service:
+    build:
+      context: ..
+      dockerfile: Scripts/Dockerfile.BookService
+    container_name: book_service
+    ports:
+      - "5003:8080"
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=book_db;Username=postgres;Password=postgres"
     depends_on:
       postgres:
         condition: service_healthy
