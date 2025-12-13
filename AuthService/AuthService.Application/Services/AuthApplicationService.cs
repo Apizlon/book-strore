@@ -137,7 +137,23 @@ public class AuthApplicationService : IAuthApplicationService
         }
 
         _logger.LogInformation("User registered successfully - {Username}", request.Username);
-        return _jwtService.GenerateToken(authUser.Id, authUser.Username, authUser.Role);
+        var userProfile = await  _userServiceClient.GetUserByUsernameAsync(request.Username) ?? throw new NotFoundException($"User with username {request.Username} not fount");
+        var permissions = Permissions.GetPermissionsForRole(authUser.Role);
+
+        _logger.LogInformation("User logged in successfully - {Username}", request.Username);
+    
+        var tokenResponse = _jwtService.GenerateToken(authUser.Id, authUser.Username, authUser.Role);
+
+        tokenResponse.User = new UserResponse
+        {
+            Id = userProfile.Id,
+            Username = userProfile.Username,
+            Role = authUser.Role.ToString(),
+            IsActive = authUser.IsActive,
+            Permissions = permissions
+        };
+
+        return tokenResponse;
     }
 
     public async Task<TokenValidationResponse> ValidateTokenAsync(string token)

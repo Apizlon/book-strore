@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
+
 export function RegisterPage() {
   const [formData, setFormData] = useState({
     username: '',
@@ -12,6 +13,7 @@ export function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -19,16 +21,20 @@ export function RegisterPage() {
     });
   };
 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
+
     setIsLoading(true);
+
 
     try {
       const response = await fetch('http://localhost:5001/api/auth/register', {
@@ -43,8 +49,10 @@ export function RegisterPage() {
         })
       });
 
+
       const data = await response.json();
       console.log('🔍 REGISTER API RESPONSE:', data);
+
 
       if (!response.ok) {
         console.log('❌ Register error:', data);
@@ -52,9 +60,11 @@ export function RegisterPage() {
         return;
       }
 
+
       // ✅ НОВАЯ СТРУКТУРА ОТВЕТА
       const token = data.accessToken;
       const userData = data.user;
+
 
       if (!token || !userData) {
         console.error('❌ Missing token or user:', data);
@@ -62,11 +72,21 @@ export function RegisterPage() {
         return;
       }
 
+
       console.log('✅ REGISTER SUCCESS:', { token: 'OK', user: userData });
       
+      // ✅ СОХРАНЯЕМ ДАННЫЕ В ЛОКАЛЬНОЕ ХРАНИЛИЩЕ
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
       
+      // ✅ ТРИГГЕРИМ СОБЫТИЕ ДЛЯ HEADER
+      window.dispatchEvent(new Event('userUpdated'));
+      
+      console.log('💾 Saved to localStorage:');
+      console.log('  token:', localStorage.getItem('token') ? 'OK' : 'MISSING');
+      console.log('  user:', localStorage.getItem('user') ? 'OK' : 'MISSING');
+      
+      // ✅ НАВИГИРУЕМ СРАЗУ БЕЗ ЗАДЕРЖКИ
       navigate('/');
     } catch (err) {
       console.error('🌐 Network error:', err);
@@ -75,6 +95,7 @@ export function RegisterPage() {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div style={{ padding: '50px', maxWidth: '400px', margin: '0 auto' }}>
@@ -93,6 +114,7 @@ export function RegisterPage() {
         </div>
       )}
 
+
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>Username</label>
@@ -106,6 +128,7 @@ export function RegisterPage() {
           />
         </div>
 
+
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>Email</label>
           <input
@@ -117,6 +140,7 @@ export function RegisterPage() {
             style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
           />
         </div>
+
 
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>Password</label>
@@ -130,6 +154,7 @@ export function RegisterPage() {
           />
         </div>
 
+
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>Confirm Password</label>
           <input
@@ -141,6 +166,7 @@ export function RegisterPage() {
             style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
           />
         </div>
+
 
         <button 
           type="submit" 
@@ -159,6 +185,7 @@ export function RegisterPage() {
           {isLoading ? 'Registering...' : 'Register'}
         </button>
       </form>
+
 
       <p style={{ textAlign: 'center', marginTop: '20px' }}>
         Already have an account?{' '}

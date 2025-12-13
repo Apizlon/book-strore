@@ -20,23 +20,22 @@ export function LoginPage({ onLoginSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
     setIsLoading(true);
 
     try {
       const response = await fetch('http://localhost:5001/api/auth/login', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          username: formData.username, 
-          password: formData.password 
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password
         })
       });
 
       const data = await response.json();
-      console.log('🔍 RAW API RESPONSE:', data);
+      console.log('🔍 LOGIN API RESPONSE:', data);
 
       if (!response.ok) {
         console.log('❌ Login error:', data);
@@ -55,14 +54,24 @@ export function LoginPage({ onLoginSuccess }) {
       }
 
       console.log('✅ LOGIN SUCCESS:', { token: 'OK', user: userData });
-      
+
+      // ✅ СОХРАНЯЕМ ДАННЫЕ В ЛОКАЛЬНОЕ ХРАНИЛИЩЕ
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
-      
+
+      // ✅ ТРИГГЕРИМ СОБЫТИЕ ДЛЯ HEADER
+      window.dispatchEvent(new Event('userUpdated'));
+
+      console.log('💾 Saved to localStorage:');
+      console.log('  token:', localStorage.getItem('token') ? 'OK' : 'MISSING');
+      console.log('  user:', localStorage.getItem('user') ? 'OK' : 'MISSING');
+
+      // ✅ ВЫЗЫВАЕМ CALLBACK В APP (если есть)
       if (onLoginSuccess) {
         onLoginSuccess();
       }
-      
+
+      // ✅ НАВИГИРУЕМ
       navigate('/');
     } catch (err) {
       console.error('🌐 Network error:', err);
@@ -75,13 +84,13 @@ export function LoginPage({ onLoginSuccess }) {
   return (
     <div style={{ padding: '50px', maxWidth: '400px', margin: '0 auto' }}>
       <h1 style={{ textAlign: 'center', marginBottom: '30px' }}>Login</h1>
-      
+
       {error && (
-        <div style={{ 
-          background: '#fee', 
-          color: '#c33', 
-          padding: '15px', 
-          borderRadius: '5px', 
+        <div style={{
+          background: '#fee',
+          color: '#c33',
+          padding: '15px',
+          borderRadius: '5px',
           marginBottom: '20px',
           borderLeft: '4px solid #c33'
         }}>
@@ -114,15 +123,15 @@ export function LoginPage({ onLoginSuccess }) {
           />
         </div>
 
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={isLoading}
-          style={{ 
-            width: '100%', 
-            padding: '12px', 
-            background: isLoading ? '#ccc' : '#208092', 
-            color: 'white', 
-            border: 'none', 
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: isLoading ? '#ccc' : '#208092',
+            color: 'white',
+            border: 'none',
             borderRadius: '4px',
             cursor: isLoading ? 'not-allowed' : 'pointer',
             fontSize: '16px'

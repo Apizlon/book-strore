@@ -1,70 +1,192 @@
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, LogOut } from 'lucide-react';
+import { LogOut, ShoppingCart, Home } from 'lucide-react';
 
-export function Header({ user }) {
+export function Header() {
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const loadUser = () => {
+      const storedUser = localStorage.getItem('user');
+      console.log('🧑 Header useEffect: storedUser =', storedUser);
+      
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          console.log('🧑 Header parsed user:', parsedUser);
+          setUser(parsedUser);
+        } catch (e) {
+          console.error('Failed to parse user:', e);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+
+    loadUser();
+
+    // ✅ СЛУШАЕМ КАСТОМНОЕ СОБЫТИЕ
+    window.addEventListener('userUpdated', loadUser);
+    window.addEventListener('storage', loadUser);
+    
+    return () => {
+      window.removeEventListener('userUpdated', loadUser);
+      window.removeEventListener('storage', loadUser);
+    };
+  }, []);
+
   const handleLogout = () => {
-    console.log('🚪 Logging out...');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    navigate('/');
-    window.location.reload();
+    setUser(null);
+    navigate('/login');
   };
 
-  console.log('🧑 Header render: user =', user ? user.username : 'null');
-
   return (
-    <header style={{ background: '#fff', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link to="/" style={{ fontSize: '24px', fontWeight: 'bold', color: '#208092', textDecoration: 'none' }}>
-          📚 BookStore
+    <header style={{
+      background: '#fff',
+      borderBottom: '1px solid #e5e7eb',
+      padding: '16px 20px',
+      position: 'sticky',
+      top: 0,
+      zIndex: 50
+    }}>
+      <div style={{
+        maxWidth: '1200px',
+        margin: '0 auto',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        {/* Logo */}
+        <Link 
+          to="/" 
+          style={{
+            fontSize: '20px',
+            fontWeight: 'bold',
+            color: '#208092',
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Home style={{ width: '24px', height: '24px' }} />
+          BookStore
         </Link>
 
-        <nav style={{ display: 'flex', gap: '20px' }}>
-          <Link to="/books" style={{ color: '#666', textDecoration: 'none' }}>Books</Link>
-          {user && (
-            <>
-              <Link to="/profile" style={{ color: '#666', textDecoration: 'none' }}>Profile</Link>
-              <Link to="/orders" style={{ color: '#666', textDecoration: 'none' }}>Orders</Link>
-            </>
-          )}
-          {user?.role === 'Moderator' || user?.role === 'Admin' ? (
-            <Link to="/admin" style={{ color: '#666', textDecoration: 'none' }}>Admin</Link>
-          ) : null}
-        </nav>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <Link to="/cart" style={{ display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none' }}>
-            <ShoppingCart style={{ width: '24px', height: '24px', color: '#666' }} />
+        {/* Navigation */}
+        <nav style={{
+          display: 'flex',
+          gap: '20px',
+          alignItems: 'center'
+        }}>
+          <Link 
+            to="/books"
+            style={{
+              color: '#6b7280',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            Books
           </Link>
 
-          {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontWeight: '500', color: '#333' }}>Hi, {user.username}</span>
-              <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <LogOut style={{ width: '20px', height: '20px', color: '#dc2626' }} />
-              </button>
-            </div>
-          ) : (
-            <>
-              <Link to="/login" style={{ color: '#208092', textDecoration: 'none' }}>Login</Link>
-              <Link 
-                to="/register" 
-                style={{ 
-                  background: '#208092', 
-                  color: 'white', 
-                  padding: '8px 16px', 
-                  borderRadius: '4px', 
-                  textDecoration: 'none',
-                  fontWeight: '500'
-                }}
-              >
-                Register
-              </Link>
-            </>
+          {user && (
+            <Link 
+              to="/orders"
+              style={{
+                color: '#6b7280',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              Orders
+            </Link>
           )}
-        </div>
+
+          {/* Cart */}
+          <Link 
+            to="/cart"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: '#208092',
+              textDecoration: 'none',
+              fontWeight: '600'
+            }}
+          >
+            <ShoppingCart style={{ width: '20px', height: '20px' }} />
+            Cart
+          </Link>
+
+          {/* User Section */}
+          <div style={{ borderLeft: '1px solid #e5e7eb', paddingLeft: '20px' }}>
+            {user ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '14px', color: '#1f2937' }}>
+                  👤 {user.username}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                  }}
+                >
+                  <LogOut style={{ width: '16px', height: '16px' }} />
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <Link 
+                  to="/login"
+                  style={{
+                    background: '#208092',
+                    color: 'white',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Login
+                </Link>
+                <Link 
+                  to="/register"
+                  style={{
+                    background: 'transparent',
+                    color: '#208092',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #208092',
+                    textDecoration: 'none',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Register
+                </Link>
+              </div>
+            )}
+          </div>
+        </nav>
       </div>
     </header>
   );
