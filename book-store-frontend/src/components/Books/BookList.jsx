@@ -1,72 +1,53 @@
 import { useState, useEffect } from 'react';
-import { booksAPI } from '../../api/books';
 import { BookCard } from './BookCard';
-import { BOOK_GENRES } from '../../utils/constants';
 
 export function BookList() {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedGenre, setSelectedGenre] = useState('');
-  const [sortBy, setSortBy] = useState('new');
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     fetchBooks();
-  }, [selectedGenre, sortBy]);
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error('Failed to parse user:', e);
+      }
+    }
+  }, []);
 
   const fetchBooks = async () => {
-    setLoading(true);
     try {
-      let response;
-      if (selectedGenre) {
-        response = await booksAPI.getBooksByGenre(selectedGenre);
-      } else if (sortBy === 'rating') {
-        response = await booksAPI.getTopRatedBooks(20);
-      } else {
-        response = await booksAPI.getAllBooks();
-      }
-      setBooks(response.data);
-    } catch (error) {
-      console.error('Failed to fetch books:', error);
+      const response = await fetch('http://localhost:5003/api/books');
+      if (!response.ok) throw new Error('Failed to fetch books');
+      const data = await response.json();
+      setBooks(data);
+    } catch (err) {
+      console.error('Books error:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  if (loading) return <div style={{ padding: '100px', textAlign: 'center' }}>Loading books...</div>;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8">Our Books</h1>
-
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <select
-          value={selectedGenre}
-          onChange={(e) => setSelectedGenre(e.target.value)}
-          className="px-4 py-2 border rounded-lg"
-        >
-          <option value="">All Genres</option>
-          {BOOK_GENRES.map(genre => (
-            <option key={genre} value={genre}>{genre}</option>
-          ))}
-        </select>
-
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="px-4 py-2 border rounded-lg"
-        >
-          <option value="new">Newest</option>
-          <option value="rating">Top Rated</option>
-        </select>
+    <div style={{ padding: '40px 20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: '36px', fontWeight: 'bold', textAlign: 'center', marginBottom: '40px', color: '#1f2937' }}>
+        📚 Our Books Collection
+      </h1>
+      
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+        gap: '30px' 
+      }}>
+        {books.map(book => (
+          <BookCard key={book.id} book={book} user={user} />
+        ))}
       </div>
-
-      {loading ? (
-        <div className="text-center py-12">Loading...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {books.map(book => (
-            <BookCard key={book.id} book={book} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
