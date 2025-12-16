@@ -1,6 +1,37 @@
 version: '3.8'
 
 services:
+  # Zookeeper
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    networks:
+      - microservices_network
+
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    networks:
+      - microservices_network
+
+
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
@@ -14,13 +45,72 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - microservices_network
+
+
+  # ClickHouse
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - microservices_network
+    depends_on:
+      - kafka
+
+
+  # ClickHouse Init (создание таблиц)
+  clickhouse-init:
+    image: clickhouse/clickhouse-client:latest
+    container_name: clickhouse_init
+    depends_on:
+      - clickhouse
+    entrypoint: |
+      sh -c '
+      sleep 5
+      clickhouse-client -h clickhouse --multiquery < /init.sql
+      '
+    volumes:
+      - ./clickhouse-init.sql:/init.sql
+    networks:
+      - microservices_network
+
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - microservices_network
+
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - microservices_network
+
 
   # AuthService
   auth_service:
@@ -36,19 +126,18 @@ services:
       Jwt__Audience: "YourAppUsers"
       Jwt__ExpirationMinutes: "60"
       Services__UserServiceUrl: "http://user_service:5002"
+      Kafka__BootstrapServers: "kafka:9092"
+      Kafka__Topic: "book-metrics"
     ports:
       - "5001:5001"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
+      - kafka
+      - clickhouse-init
     networks:
       - microservices_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/api/auth/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: on-failure
+
 
   # UserService
   user_service:
@@ -59,43 +148,46 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:5002
       ConnectionStrings__DefaultConnection: "Server=postgres;Port=5432;Database=user_db;User Id=postgres;Password=postgres;"
+      Kafka__BootstrapServers: "kafka:9092"
+      Kafka__Topic: "book-metrics"
     ports:
       - "5002:5002"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
+      - kafka
+      - clickhouse-init
     networks:
       - microservices_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5002/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: on-failure
 
-  book-service:
+
+  # BookService
+  book_service:
     build:
       context: ..
       dockerfile: Scripts/Dockerfile.BookService
     container_name: book_service
-    ports:
-      - "5003:8080"
     environment:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=book_db;Username=postgres;Password=postgres"
+      Kafka__BootstrapServers: "kafka:9092"
+      Kafka__Topic: "book-metrics"
+    ports:
+      - "5003:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
+      - kafka
+      - clickhouse-init
     networks:
       - microservices_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5002/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: on-failure
+
 
 volumes:
   postgres_data:
+  clickhouse_data:
+  prometheus_data:
+  grafana_data:
+
 
 networks:
   microservices_network:
