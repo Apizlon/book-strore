@@ -92,6 +92,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_SECURITY_ADMIN_USER: admin
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
     ports:
       - "3333:3000"
     volumes:

@@ -29,8 +29,3 @@ scrape_configs:
     static_configs:
       - targets: ['book_service:8080']
     metrics_path: '/metrics'
-
-  - job_name: 'clickhouse'
-    static_configs:
-      - targets: ['clickhouse:8123']
-    metrics_path: '/metrics'
