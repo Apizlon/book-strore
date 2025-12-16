@@ -6,6 +6,7 @@ using AuthService.Api.Filters;
 using AuthService.DataAccess.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +63,7 @@ builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 // Add application services
 builder.Services.AddScoped<IAuthApplicationService, AuthApplicationService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddSingleton<IClickHouseSender, ClickHouseSender>();
 builder.Services.AddLogging(config =>
 {
     config.ClearProviders();
@@ -92,9 +94,10 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
     dbContext.Database.Migrate();
 }
+app.UseHttpMetrics();
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.MapControllers();
-
+app.MapMetrics("/metrics");
 app.Run();

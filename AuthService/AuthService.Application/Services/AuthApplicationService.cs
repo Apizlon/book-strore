@@ -13,147 +13,169 @@ public class AuthApplicationService : IAuthApplicationService
     private readonly IAuthRepository _authRepository;
     private readonly IJwtService _jwtService;
     private readonly IUserServiceClient _userServiceClient;
+    private readonly IClickHouseSender _clickHouseSender;
     private readonly ILogger<AuthApplicationService> _logger;
 
     public AuthApplicationService(
         IAuthRepository authRepository,
         IJwtService jwtService,
         IUserServiceClient userServiceClient,
+        IClickHouseSender clickHouseSender,
         ILogger<AuthApplicationService> logger)
     {
         _authRepository = authRepository;
         _jwtService = jwtService;
         _userServiceClient = userServiceClient;
+        _clickHouseSender = clickHouseSender;
         _logger = logger;
     }
 
     public async Task<TokenResponse> LoginAsync(LoginRequest request)
     {
-        var authUser = await _authRepository.GetAuthUserByUsernameAsync(request.Username);
-
-        if (authUser == null)
+        try
         {
-            _logger.LogWarning("Login failed: User not found - {Username}", request.Username);
-            throw new BadRequestException("Invalid credentials");
+            var authUser = await _authRepository.GetAuthUserByUsernameAsync(request.Username);
+
+            if (authUser == null)
+            {
+                _logger.LogWarning("Login failed: User not found - {Username}", request.Username);
+                await _clickHouseSender.SendEventAsync("Login", request.Username, "Failure", "User not found");
+                throw new BadRequestException("Invalid credentials");
+            }
+
+            if (!VerifyPassword(request.Password, authUser.PasswordHash))
+            {
+                _logger.LogWarning("Login failed: Invalid password - {Username}", request.Username);
+                await _clickHouseSender.SendEventAsync("Login", request.Username, "Failure", "Invalid password");
+                throw new BadRequestException("Invalid credentials");
+            }
+
+            if (!authUser.IsActive)
+            {
+                _logger.LogWarning("Login failed: User is inactive - {Username}", request.Username);
+                await _clickHouseSender.SendEventAsync("Login", request.Username, "Failure", "User inactive");
+                throw new BadRequestException("User account is deactivated");
+            }
+
+            var userProfile = await _userServiceClient.GetUserByUsernameAsync(request.Username) 
+                ?? throw new NotFoundException($"User with username {request.Username} not found");
+            
+            var permissions = Permissions.GetPermissionsForRole(authUser.Role);
+
+            _logger.LogInformation("User logged in successfully - {Username}", request.Username);
+            await _clickHouseSender.SendEventAsync("Login", request.Username, "Success", "");
+
+            var tokenResponse = _jwtService.GenerateToken(authUser.Id, authUser.Username, authUser.Role);
+
+            tokenResponse.User = new UserResponse
+            {
+                Id = userProfile.Id,
+                Username = userProfile.Username,
+                Role = authUser.Role.ToString(),
+                IsActive = authUser.IsActive,
+                Permissions = permissions
+            };
+
+            return tokenResponse;
         }
-
-        if (!VerifyPassword(request.Password, authUser.PasswordHash))
+        catch (Exception ex) when (!(ex is BadRequestException || ex is NotFoundException))
         {
-            _logger.LogWarning("Login failed: Invalid password - {Username}", request.Username);
-            throw new BadRequestException("Invalid credentials");
+            await _clickHouseSender.SendEventAsync("Login", request.Username, "Failure", ex.Message);
+            throw;
         }
-
-        if (!authUser.IsActive)
-        {
-            _logger.LogWarning("Login failed: User is inactive - {Username}", request.Username);
-            throw new BadRequestException("User account is deactivated");
-        }
-
-
-        var userProfile = await  _userServiceClient.GetUserByUsernameAsync(request.Username) ?? throw new NotFoundException($"User with username {request.Username} not fount");
-        var permissions = Permissions.GetPermissionsForRole(authUser.Role);
-
-        _logger.LogInformation("User logged in successfully - {Username}", request.Username);
-    
-        var tokenResponse = _jwtService.GenerateToken(authUser.Id, authUser.Username, authUser.Role);
-
-        tokenResponse.User = new UserResponse
-        {
-            Id = userProfile.Id,
-            Username = userProfile.Username,
-            Role = authUser.Role.ToString(),
-            IsActive = authUser.IsActive,
-            Permissions = permissions
-        };
-
-        return tokenResponse;
     }
-
 
     public async Task<TokenResponse> RegisterAsync(RegisterRequest request)
     {
-        // Check if user already exists in auth service
-        var existingAuthUser = await _authRepository.GetAuthUserByUsernameAsync(request.Username);
-        if (existingAuthUser != null)
-        {
-            _logger.LogWarning("Registration failed: Username already exists - {Username}", request.Username);
-            throw new BadRequestException("Username already exists");
-        }
-
-        // Check if user exists in UserService by username
-        var existingUserByUsername = await _userServiceClient.GetUserByUsernameAsync(request.Username);
-        if (existingUserByUsername != null)
-        {
-            _logger.LogWarning("Registration failed: Username already exists in UserService - {Username}", request.Username);
-            throw new BadRequestException("Username already exists");
-        }
-
-        // Check if email already exists in UserService (if provided)
-        if (!string.IsNullOrEmpty(request.Email))
-        {
-            var emailExists = await _userServiceClient.EmailExistsAsync(request.Email);
-            if (emailExists)
-            {
-                _logger.LogWarning("Registration failed: Email already exists - {Email}", request.Email);
-                throw new BadRequestException("Email already exists");
-            }
-        }
-
-        // Create auth user
-        var userId = Guid.NewGuid().ToString();
-        var authUser = new AuthUser
-        {
-            Id = userId,
-            Username = request.Username,
-            PasswordHash = HashPassword(request.Password),
-            IsActive = true,
-            Role = UserRole.User,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        await _authRepository.CreateAuthUserAsync(authUser);
-        _logger.LogInformation("Auth user created - {Username}", request.Username);
-
-        // Create user profile in UserService
         try
         {
-            var createUserRequest = new CreateUserRequest
+            var existingAuthUser = await _authRepository.GetAuthUserByUsernameAsync(request.Username);
+            if (existingAuthUser != null)
+            {
+                _logger.LogWarning("Registration failed: Username already exists - {Username}", request.Username);
+                await _clickHouseSender.SendEventAsync("Register", request.Username, "Failure", "Username exists");
+                throw new BadRequestException("Username already exists");
+            }
+
+            var existingUserByUsername = await _userServiceClient.GetUserByUsernameAsync(request.Username);
+            if (existingUserByUsername != null)
+            {
+                _logger.LogWarning("Registration failed: Username already exists in UserService - {Username}", request.Username);
+                await _clickHouseSender.SendEventAsync("Register", request.Username, "Failure", "Username exists");
+                throw new BadRequestException("Username already exists");
+            }
+
+            if (!string.IsNullOrEmpty(request.Email))
+            {
+                var emailExists = await _userServiceClient.EmailExistsAsync(request.Email);
+                if (emailExists)
+                {
+                    _logger.LogWarning("Registration failed: Email already exists - {Email}", request.Email);
+                    await _clickHouseSender.SendEventAsync("Register", request.Username, "Failure", "Email exists");
+                    throw new BadRequestException("Email already exists");
+                }
+            }
+
+            var userId = Guid.NewGuid().ToString();
+            var authUser = new AuthUser
             {
                 Id = userId,
                 Username = request.Username,
-                Email = request.Email,
-                DateOfBirth = request.DateOfBirth
+                PasswordHash = HashPassword(request.Password),
+                IsActive = true,
+                Role = UserRole.User,
+                CreatedAt = DateTime.UtcNow
             };
 
-            await _userServiceClient.CreateUserAsync(createUserRequest);
-            _logger.LogInformation("User profile created in UserService - {Username}", request.Username);
+            await _authRepository.CreateAuthUserAsync(authUser);
+            _logger.LogInformation("Auth user created - {Username}", request.Username);
+
+            try
+            {
+                var createUserRequest = new CreateUserRequest
+                {
+                    Id = userId,
+                    Username = request.Username,
+                    Email = request.Email,
+                    DateOfBirth = request.DateOfBirth
+                };
+
+                await _userServiceClient.CreateUserAsync(createUserRequest);
+                _logger.LogInformation("User profile created in UserService - {Username}", request.Username);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create user profile in UserService, rolling back auth user");
+                await _authRepository.DeleteAuthUserAsync(userId);
+                await _clickHouseSender.SendEventAsync("Register", request.Username, "Failure", "UserService error");
+                throw new InvalidOperationException("Failed to complete registration");
+            }
+
+            _logger.LogInformation("User registered successfully - {Username}", request.Username);
+            await _clickHouseSender.SendEventAsync("Register", request.Username, "Success", "");
+
+            var userProfile = await _userServiceClient.GetUserByUsernameAsync(request.Username) 
+                ?? throw new NotFoundException($"User with username {request.Username} not found");
+            
+            var permissions = Permissions.GetPermissionsForRole(authUser.Role);
+            var tokenResponse = _jwtService.GenerateToken(authUser.Id, authUser.Username, authUser.Role);
+
+            tokenResponse.User = new UserResponse
+            {
+                Id = userProfile.Id,
+                Username = userProfile.Username,
+                Role = authUser.Role.ToString(),
+                IsActive = authUser.IsActive,
+                Permissions = permissions
+            };
+
+            return tokenResponse;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!(ex is BadRequestException || ex is NotFoundException || ex is InvalidOperationException))
         {
-            // If UserService fails, we should rollback the auth user creation
-            _logger.LogError(ex, "Failed to create user profile in UserService, rolling back auth user");
-            await _authRepository.DeleteAuthUserAsync(userId);
-            throw new InvalidOperationException("Failed to complete registration");
+            await _clickHouseSender.SendEventAsync("Register", request.Username, "Failure", ex.Message);
+            throw;
         }
-
-        _logger.LogInformation("User registered successfully - {Username}", request.Username);
-        var userProfile = await  _userServiceClient.GetUserByUsernameAsync(request.Username) ?? throw new NotFoundException($"User with username {request.Username} not fount");
-        var permissions = Permissions.GetPermissionsForRole(authUser.Role);
-
-        _logger.LogInformation("User logged in successfully - {Username}", request.Username);
-    
-        var tokenResponse = _jwtService.GenerateToken(authUser.Id, authUser.Username, authUser.Role);
-
-        tokenResponse.User = new UserResponse
-        {
-            Id = userProfile.Id,
-            Username = userProfile.Username,
-            Role = authUser.Role.ToString(),
-            IsActive = authUser.IsActive,
-            Permissions = permissions
-        };
-
-        return tokenResponse;
     }
 
     public async Task<TokenValidationResponse> ValidateTokenAsync(string token)
@@ -162,7 +184,6 @@ public class AuthApplicationService : IAuthApplicationService
         {
             var (userId, username, role, permissions) = _jwtService.ValidateAndExtractClaims(token);
 
-            // Double-check user is still active in AuthService
             var authUser = await _authRepository.GetAuthUserByIdAsync(userId);
             
             if (authUser == null || !authUser.IsActive)
