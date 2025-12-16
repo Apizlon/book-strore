@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS book_metrics.book_metrics_kafka (
 SETTINGS 
     kafka_broker_list = 'kafka:9092',
     kafka_topic_list = 'book-metrics',
-    kafka_group_id = 'clickhouse-group',
+    kafka_group_name = 'clickhouse-group',
     kafka_format = 'JSONEachRow',
     kafka_num_consumers = 1;
 

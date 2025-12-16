@@ -48,38 +48,27 @@ services:
     networks:
       - microservices_network
 
-
-  # ClickHouse
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     container_name: clickhouse
+    environment:
+      CLICKHOUSE_USER: user
+      CLICKHOUSE_PASSWORD: user
     ports:
       - "8123:8123"
       - "9000:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-    networks:
-      - microservices_network
-    depends_on:
-      - kafka
-
-
-  # ClickHouse Init (создание таблиц)
-  clickhouse-init:
-    image: clickhouse/clickhouse-client:latest
-    container_name: clickhouse_init
-    depends_on:
-      - clickhouse
+      - ./clickhouse-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     entrypoint: |
       sh -c '
-      sleep 5
-      clickhouse-client -h clickhouse --multiquery < /init.sql
+      /entrypoint.sh &
+      sleep 10
+      clickhouse-client --queries-file /docker-entrypoint-initdb.d/init.sql
+      wait
       '
-    volumes:
-      - ./clickhouse-init.sql:/init.sql
     networks:
       - microservices_network
-
 
   # Prometheus
   prometheus:
@@ -96,18 +85,18 @@ services:
     networks:
       - microservices_network
 
-
-  # Grafana
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_SECURITY_ADMIN_USER: admin
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
     ports:
-      - "3000:3000"
+      - "3333:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
     networks:
       - microservices_network
 
@@ -133,7 +122,6 @@ services:
     depends_on:
       - postgres
       - kafka
-      - clickhouse-init
     networks:
       - microservices_network
     restart: on-failure
@@ -155,7 +143,6 @@ services:
     depends_on:
       - postgres
       - kafka
-      - clickhouse-init
     networks:
       - microservices_network
     restart: on-failure
@@ -176,7 +163,6 @@ services:
     depends_on:
       - postgres
       - kafka
-      - clickhouse-init
     networks:
       - microservices_network
     restart: on-failure

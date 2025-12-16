@@ -9,11 +9,13 @@ datasources:
     editable: true
 
   - name: ClickHouse
-    type: grafana-clickhouse-datasource
+    type: clickhouse
     access: proxy
     url: http://clickhouse:8123
-    database: book-metrics
-    user: default
+    database: book_metrics
+    jsonData:
+      defaultDatabase: book_metrics
     secureJsonData:
-      password: clickhouse
+      password: user
+    user: user
     editable: true
