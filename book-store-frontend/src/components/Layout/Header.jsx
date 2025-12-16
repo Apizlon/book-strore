@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, ShoppingCart, Home } from 'lucide-react';
+import { LogOut, ShoppingCart, Home, User } from 'lucide-react';
+
 
 export function Header() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+
 
   useEffect(() => {
     const loadUser = () => {
@@ -25,7 +27,9 @@ export function Header() {
       }
     };
 
+
     loadUser();
+
 
     // ✅ СЛУШАЕМ КАСТОМНОЕ СОБЫТИЕ
     window.addEventListener('userUpdated', loadUser);
@@ -37,12 +41,14 @@ export function Header() {
     };
   }, []);
 
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     navigate('/login');
   };
+
 
   return (
     <header style={{
@@ -77,6 +83,7 @@ export function Header() {
           BookStore
         </Link>
 
+
         {/* Navigation */}
         <nav style={{
           display: 'flex',
@@ -95,19 +102,34 @@ export function Header() {
             Books
           </Link>
 
+
           {user && (
-            <Link 
-              to="/orders"
-              style={{
-                color: '#6b7280',
-                textDecoration: 'none',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              Orders
-            </Link>
+            <>
+              <Link 
+                to="/profile"
+                style={{
+                  color: '#6b7280',
+                  textDecoration: 'none',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Profile
+              </Link>
+              <Link 
+                to="/orders"
+                style={{
+                  color: '#6b7280',
+                  textDecoration: 'none',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Orders
+              </Link>
+            </>
           )}
+
 
           {/* Cart */}
           <Link 
@@ -125,13 +147,30 @@ export function Header() {
             Cart
           </Link>
 
+
           {/* User Section */}
           <div style={{ borderLeft: '1px solid #e5e7eb', paddingLeft: '20px' }}>
             {user ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '14px', color: '#1f2937' }}>
-                  👤 {user.username}
-                </span>
+                <Link 
+                  to="/profile"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '14px',
+                    color: '#1f2937',
+                    textDecoration: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                >
+                  <User style={{ width: '16px', height: '16px' }} />
+                  {user.username}
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
