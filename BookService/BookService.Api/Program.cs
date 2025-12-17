@@ -6,6 +6,7 @@ using BookService.DataAccess.Repositories;
 using Microsoft.OpenApi.Models;
 using BookService.Api.Filters;
 using Microsoft.EntityFrameworkCore;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,9 +96,9 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<BookDbContext>();
     dbContext.Database.Migrate();
 }
-
+app.UseHttpMetrics();
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.MapControllers();
-
+app.MapMetrics("/metrics");
 app.Run();

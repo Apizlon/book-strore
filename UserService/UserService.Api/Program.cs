@@ -2,6 +2,7 @@ using UserService.Application.Services;
 using UserService.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Prometheus;
 using UserService.Api.Configuration;
 using UserService.Api.Filters;
 using UserService.Application.Interfaces;
@@ -87,9 +88,9 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<UserDbContext>();
     dbContext.Database.Migrate();
 }
-
+app.UseHttpMetrics();
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.MapControllers();
-
+app.MapMetrics("/metrics");
 app.Run();

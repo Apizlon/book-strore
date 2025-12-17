@@ -98,9 +98,10 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./bookstore.json:/etc/grafana/provisioning/dashboards/bookstore.json:ro
     networks:
       - microservices_network
-
 
   # AuthService
   auth_service:

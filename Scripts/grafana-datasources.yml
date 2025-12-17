@@ -7,12 +7,14 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: true
+    uid: prometheus
 
   - name: ClickHouse
     type: grafana-clickhouse-datasource
     access: proxy
     url: http://clickhouse:8123
     database: book_metrics
+    uid: clickhouse
     jsonData:
       defaultDatabase: book_metrics
       port: 8123
