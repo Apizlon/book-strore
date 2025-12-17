@@ -4,5 +4,6 @@ npm i
 npm run dev
 
 # При экспорте дашборда из графаны
+автоматического решения нейронка не придумала, поэтому снова терпим
 ${DS_PROMETHEUS} на prometheus
 ${DS_CLICKHOUSE} на clickhouse
