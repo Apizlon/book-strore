@@ -10,27 +10,41 @@ public class BookApplicationService : IBookApplicationService
 {
     private readonly IBookRepository _bookRepository;
     private readonly IAuthorRepository _authorRepository;
+    private readonly IClickHouseSender _clickHouseSender;
     private readonly ILogger<BookApplicationService> _logger;
 
     public BookApplicationService(
         IBookRepository bookRepository,
         IAuthorRepository authorRepository,
+        IClickHouseSender clickHouseSender,
         ILogger<BookApplicationService> logger)
     {
         _bookRepository = bookRepository;
         _authorRepository = authorRepository;
+        _clickHouseSender = clickHouseSender;
         _logger = logger;
     }
 
     public async Task<BookDto> GetBookByIdAsync(string bookId)
     {
-        var book = await _bookRepository.GetByIdAsync(bookId);
-        if (book == null)
+        try
         {
-            throw new NotFoundException("Book not found");
-        }
+            var book = await _bookRepository.GetByIdAsync(bookId);
+            if (book == null)
+            {
+                throw new NotFoundException("Book not found");
+            }
 
-        return MapToDto(book);
+            // ✅ Метрика в ClickHouse
+            await _clickHouseSender.SendEventAsync("BookById", "system", "Success", book.Title);
+
+            return MapToDto(book);
+        }
+        catch (Exception ex) when (!(ex is NotFoundException))
+        {
+            await _clickHouseSender.SendEventAsync("BookById", "system", "Failure", ex.Message);
+            throw;
+        }
     }
 
     public async Task<IEnumerable<BookDto>> GetAllBooksAsync()
@@ -41,25 +55,49 @@ public class BookApplicationService : IBookApplicationService
 
     public async Task<IEnumerable<BookDto>> GetBooksByAuthorAsync(string authorId)
     {
-        var author = await _authorRepository.GetByIdAsync(authorId);
-        if (author == null)
+        try
         {
-            throw new NotFoundException("Author not found");
-        }
+            var author = await _authorRepository.GetByIdAsync(authorId);
+            if (author == null)
+            {
+                throw new NotFoundException("Author not found");
+            }
 
-        var books = await _bookRepository.GetByAuthorIdAsync(authorId);
-        return books.Select(MapToDto);
+            var books = await _bookRepository.GetByAuthorIdAsync(authorId);
+            
+            // ✅ Метрика в ClickHouse
+            await _clickHouseSender.SendEventAsync("BookByAuthorId", "system", "Success", author.Name);
+
+            return books.Select(MapToDto);
+        }
+        catch (Exception ex) when (!(ex is NotFoundException))
+        {
+            await _clickHouseSender.SendEventAsync("BookByAuthorId", "system", "Failure", ex.Message);
+            throw;
+        }
     }
 
     public async Task<IEnumerable<BookDto>> GetBooksByGenreAsync(string genre)
     {
-        if (!Enum.TryParse<BookGenre>(genre, true, out var bookGenre))
+        try
         {
-            throw new BadRequestException($"Invalid genre: {genre}");
-        }
+            if (!Enum.TryParse<BookGenre>(genre, true, out var bookGenre))
+            {
+                throw new BadRequestException($"Invalid genre: {genre}");
+            }
 
-        var books = await _bookRepository.GetByGenreAsync(bookGenre);
-        return books.Select(MapToDto);
+            var books = await _bookRepository.GetByGenreAsync(bookGenre);
+            
+            // ✅ Метрика в ClickHouse
+            await _clickHouseSender.SendEventAsync("BookByGenre", "system", "Success", genre);
+
+            return books.Select(MapToDto);
+        }
+        catch (Exception ex) when (!(ex is BadRequestException))
+        {
+            await _clickHouseSender.SendEventAsync("BookByGenre", "system", "Failure", ex.Message);
+            throw;
+        }
     }
 
     public async Task<IEnumerable<BookDto>> GetBooksByRatingAsync(int take = 10)
@@ -76,38 +114,45 @@ public class BookApplicationService : IBookApplicationService
 
     public async Task<BookDto> CreateBookAsync(CreateBookRequest request, string userId)
     {
-        var author = await _authorRepository.GetByIdAsync(request.AuthorId);
-        if (author == null)
+        try
         {
-            throw new NotFoundException("Author not found");
+            var author = await _authorRepository.GetByIdAsync(request.AuthorId);
+            if (author == null)
+            {
+                throw new NotFoundException("Author not found");
+            }
+
+            if (!Enum.TryParse<BookGenre>(request.Genre, true, out var genre))
+            {
+                throw new BadRequestException($"Invalid genre: {request.Genre}");
+            }
+
+            if (request.Price <= 0)
+            {
+                throw new BadRequestException("Price must be greater than 0");
+            }
+
+            var book = new Book
+            {
+                Id = Guid.NewGuid().ToString(),
+                Title = request.Title,
+                Description = request.Description,
+                Price = request.Price,
+                AuthorId = request.AuthorId,
+                Genre = genre,
+                PublishedDate = request.PublishedDate,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _bookRepository.CreateAsync(book);
+            _logger.LogInformation("Book created - {BookId} by user {UserId}", book.Id, userId);
+
+            return MapToDto(book);
         }
-
-        if (!Enum.TryParse<BookGenre>(request.Genre, true, out var genre))
+        catch (Exception ex) when (!(ex is NotFoundException || ex is BadRequestException))
         {
-            throw new BadRequestException($"Invalid genre: {request.Genre}");
+            throw;
         }
-
-        if (request.Price <= 0)
-        {
-            throw new BadRequestException("Price must be greater than 0");
-        }
-
-        var book = new Book
-        {
-            Id = Guid.NewGuid().ToString(),
-            Title = request.Title,
-            Description = request.Description,
-            Price = request.Price,
-            AuthorId = request.AuthorId,
-            Genre = genre,
-            PublishedDate = request.PublishedDate,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        await _bookRepository.CreateAsync(book);
-        _logger.LogInformation("Book created - {BookId} by user {UserId}", book.Id, userId);
-
-        return MapToDto(book);
     }
 
     public async Task<BookDto> UpdateBookAsync(string bookId, UpdateBookRequest request, string userId)

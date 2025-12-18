@@ -10,61 +10,78 @@ public class OrderApplicationService : IOrderApplicationService
 {
     private readonly IOrderRepository _orderRepository;
     private readonly ICartRepository _cartRepository;
+    private readonly IClickHouseSender _clickHouseSender;
     private readonly ILogger<OrderApplicationService> _logger;
 
     public OrderApplicationService(
         IOrderRepository orderRepository,
         ICartRepository cartRepository,
+        IClickHouseSender clickHouseSender,
         ILogger<OrderApplicationService> logger)
     {
         _orderRepository = orderRepository;
         _cartRepository = cartRepository;
+        _clickHouseSender = clickHouseSender;
         _logger = logger;
     }
 
     public async Task<OrderDto> CheckoutAsync(string userId)
     {
-        var cart = await _cartRepository.GetByUserIdAsync(userId);
-        if (cart == null || !cart.Items.Any())
+        try
         {
-            throw new BadRequestException("Cart is empty");
-        }
+            var cart = await _cartRepository.GetByUserIdAsync(userId);
+            if (cart == null || !cart.Items.Any())
+            {
+                throw new BadRequestException("Cart is empty");
+            }
 
-        var order = new Order
-        {
-            Id = Guid.NewGuid().ToString(),
-            UserId = userId,
-            Status = OrderStatus.Completed,
-            CreatedAt = DateTime.UtcNow,
-            Items = new List<OrderItem>(),
-            TotalPrice = 0
-        };
-
-        decimal totalPrice = 0;
-
-        foreach (var cartItem in cart.Items)
-        {
-            var orderItem = new OrderItem
+            var order = new Order
             {
                 Id = Guid.NewGuid().ToString(),
-                OrderId = order.Id,
-                BookId = cartItem.BookId,
-                PriceAtPurchase = cartItem.Book!.Price
+                UserId = userId,
+                Status = OrderStatus.Completed,
+                CreatedAt = DateTime.UtcNow,
+                Items = new List<OrderItem>(),
+                TotalPrice = 0
             };
 
-            order.Items.Add(orderItem);
-            totalPrice += cartItem.Book.Price;
+            decimal totalPrice = 0;
+
+            foreach (var cartItem in cart.Items)
+            {
+                var orderItem = new OrderItem
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    OrderId = order.Id,
+                    BookId = cartItem.BookId,
+                    PriceAtPurchase = cartItem.Book!.Price
+                };
+
+                order.Items.Add(orderItem);
+                totalPrice += cartItem.Book.Price;
+
+                // ✅ Метрика на каждую книгу в заказе
+                await _clickHouseSender.SendEventAsync("BookOrdered", userId, "Success", cartItem.Book.Title);
+            }
+
+            order.TotalPrice = totalPrice;
+
+            await _orderRepository.CreateAsync(order);
+            await _cartRepository.ClearCartAsync(userId);
+
+            _logger.LogInformation("Order created - {OrderId} for user {UserId}, total: {TotalPrice}", 
+                order.Id, userId, totalPrice);
+
+            // ✅ Метрика на весь заказ с ценой
+            await _clickHouseSender.SendEventAsync("OrderFormed", userId, "Success", totalPrice.ToString());
+
+            return MapToDto(order);
         }
-
-        order.TotalPrice = totalPrice;
-
-        await _orderRepository.CreateAsync(order);
-        await _cartRepository.ClearCartAsync(userId);
-
-        _logger.LogInformation("Order created - {OrderId} for user {UserId}, total: {TotalPrice}", 
-            order.Id, userId, totalPrice);
-
-        return MapToDto(order);
+        catch (Exception ex) when (!(ex is BadRequestException))
+        {
+            await _clickHouseSender.SendEventAsync("OrderFormed", userId, "Failure", ex.Message);
+            throw;
+        }
     }
 
     public async Task<OrderDto> GetOrderByIdAsync(string orderId, string userId)
